@@ -76,7 +76,7 @@ class Report{
     '' as 'Mob_No3', /*Mobile Number 2*/
     '' as 'Mob_No4', /*Mobile Number 2*/
     '' as 'Mob_No5', /*Mobile Number 2*/
-    
+     
     
     prod.PROD_NAME Prod_Type,/*Product Type*/
     
@@ -179,6 +179,57 @@ class Report{
 
   
           if($data){
+            
+
+            $diff = $v['PN_Value'] / 2;
+
+            
+
+
+
+            if($v['Prod_Type'] != 'Modified Business Loan-1' &&
+            $v['Prod_Type'] != 'Modified Business Loan' &&
+            $v['Prod_Type'] != 'Business Loan (NO PDC)' &&
+            $v['Prod_Type'] != 'Business Loan - NWBL1' &&
+            $v['Prod_Type'] != 'Business Loan - NWBL1 (no CA)' &&
+            $v['Prod_Type'] != 'Business Loan - NWBL2' &&
+            $v['Prod_Type'] != 'Business Loan w/ CA' &&
+            $v['Prod_Type'] != 'Modified Business Loan - RCL' &&
+            $v['Prod_Type'] != 'Micro-Business Loan' &&
+            $v['Prod_Type'] != 'Motorcycle Loan' &&
+            $v['Prod_Type'] != 'Motorcycle Loan' &&
+            $v['Prod_Type'] != 'SME - LINE' &&
+            $v['Prod_Type'] != 'SME - LITE' &&
+            $v['Prod_Type'] != 'Agricultural Loan' &&
+            $v['Prod_Type'] != 'Agricultural Loan-Monthly' &&
+            $v['Prod_Type'] != 'SME - CAPITAL' &&
+            $v['Prod_Type'] != 'Allottee Loan' &&
+            $v['Prod_Type'] != 'Beneficiary Loan'
+            ){
+
+
+
+
+
+              // Car Loan
+              // Car Loan (NOPDC)
+              // Car Loan - Takeout
+              // Car Loan - Takeout NO PDC
+              // Car Loan Renewal Express
+              // Car Loan Renewal Express (NO PDC)
+              // Doctors Loan
+              // Doctors Loan (NOPDC)
+
+
+            
+
+            if($diff >= $v['Oustanding_Bal']){
+
+
+
+
+
+
             
 
                $sstmt = $this->connJeon->prepare("INSERT INTO crm_loan_information(info_renewable_date,
@@ -410,13 +461,15 @@ class Report{
                if($sstmt){
                   print_r($v['PN_Number']. ' Data has been transfered!');
                }else{
-                print_r($v['PN_Number'].' Error');
+                print_r($v['PN_Number'].' Is not a new lead! ');
                }
           $i++;
            }else{
-               print_r($row['PN_Number'].' Error');
+               print_r($v['PN_Number'].' Error');
          }
         }
       } 
+    }
+  }
 }
 ?>
