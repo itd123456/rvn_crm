@@ -9,18 +9,17 @@ class Report{
     private $conn;
 
     private $connJeon;
-    private $hostJeon="192.168.0.116"; //testserver
-    private $userJeon="sa";
-    private $passJeon="1234";
+    private $hostJeon="192.168.0.160"; //testserver
+    private $port = "49406";
+    private $userJeon="lms";
+    private $passJeon="rvn123456@2020!";
     private $dbJeon="rvn_crm"; 
 
 
 
     public function __construct(){
-        
-        $this->connJeon=  new PDO("sqlsrv:server=".$this->hostJeon.";Database=".$this->dbJeon, $this->userJeon, $this->passJeon);
+        $this->connJeon=  new PDO("sqlsrv:server=".$this->hostJeon.",49406;Database=".$this->dbJeon, $this->userJeon, $this->passJeon);
         $this->conn=  new PDO("sqlsrv:server=".$this->host.";Database=".$this->db, $this->user, $this->pass);
-       
  }
 
  public function reseed(){
@@ -136,35 +135,37 @@ class Report{
     dbo.GetReferenceContact(lm.LOAN_BORROWER_CODE) as 'Ref_Contact' /*Character Referrence Contact No.*/
     
     from LM_LOAN lm
-    JOIN PR_BORROWERS b 
-      with (nolock)
+    left JOIN PR_BORROWERS b 
+
       ON lm.LOAN_BORROWER_CODE = b.BORR_CODE
     
-    JOIN PR_BRANCH bch 
-      with (nolock)
+   left JOIN PR_BRANCH bch 
+
       ON lm.LOAN_BR = bch.BRAN_CODE
     
-    JOIN PR_PRODUCT prod 
-      with (nolock)
+   left JOIN PR_PRODUCT prod 
+      
       ON prod.PROD_CODE = lm.LOAN_PRODUCT_CODE
     
-    join PR_BORROWERS_WORK bw 
-      with (nolock)
+   left join PR_BORROWERS_WORK bw 
+
       ON lm.LOAN_BORROWER_CODE = bw.WBOR_CODE
     
-    join PR_EMPLOYEE emp 
-      with (nolock)
+  left  join PR_EMPLOYEE emp 
+
       ON lm.LOAN_CRD_CODE = emp.EMPL_CODE -- CRD
     
-    join LM_LOAN_COMAKERS cm 
-      with (nolock)
+ left join LM_LOAN_COMAKERS cm 
+
       ON lm.LOAN_PN_NUMBER = cm.LMKR_PN_NUMBER
       
-    join LM_LOAN_AGENTS la 
-      with (nolock)
+   left join LM_LOAN_AGENTS la 
+ 
       ON lm.LOAN_PN_NUMBER= la.LCOM_PN_NUMBER
-    
-      group by  
+
+		where lm.LOAN_STATUS = '5' and lm.LOAN_APP_TYPE != 4 and lm.LOAN_APP_TYPE != 3
+	
+	        group by  
       lm.LOAN_PN_NUMBER, bch.BRAN_NAME, b.BORR_LAST_NAME, 
       b.BORR_FIRST_NAME, b.BORR_MIDDLE_NAME, b.BORR_SUFFIX, b.BORR_TELNO, b.BORR_MOBILENO, prod.PROD_NAME,
       lm.LOAN_APP_TYPE, lm.LOAN_STATUS, lm.LOAN_LAST_DUEDATE, lm.LOAN_TERMS, lm.LOAN_MONTHLYAMORT, lm.LOAN_PNVALUE,
@@ -197,13 +198,14 @@ class Report{
             $v['Prod_Type'] != 'Modified Business Loan - RCL' &&
             $v['Prod_Type'] != 'Micro-Business Loan' &&
             $v['Prod_Type'] != 'Motorcycle Loan' &&
-            $v['Prod_Type'] != 'Motorcycle Loan' &&
+            $v['Prod_Type'] != 'Motorcycle Loan - Personal Loan' &&
             $v['Prod_Type'] != 'SME - LINE' &&
             $v['Prod_Type'] != 'SME - LITE' &&
             $v['Prod_Type'] != 'Agricultural Loan' &&
             $v['Prod_Type'] != 'Agricultural Loan-Monthly' &&
             $v['Prod_Type'] != 'SME - CAPITAL' &&
             $v['Prod_Type'] != 'Allottee Loan' &&
+            $v['Prod_Type'] != 'Micro Loan' &&
             $v['Prod_Type'] != 'Beneficiary Loan'
             ){
 
@@ -221,9 +223,18 @@ class Report{
               // Doctors Loan (NOPDC)
 
 
+
+            if($v['Prod_Type'] == 'Doctors Loan' && $v['Prod_Type'] == 'Doctors Loan (NOPDC)'){
+
+
+              $diff = $v['PN_Value'] / 2 / 5 * 4;
+
+
+            }
+
             
 
-            if($diff >= $v['Oustanding_Bal']){
+            if($v['Amort_Paid'] >= $diff){
 
 
 
@@ -262,7 +273,8 @@ class Report{
                info_area,
                info_bussiness_address,
                info_released_date,
-               info_crd_reviewed_by
+               info_crd_reviewed_by,
+               cron_date
                )values(
                :info_renewable_date,
                :info_branch,
@@ -294,7 +306,8 @@ class Report{
                :info_area,
                :info_bussiness_address,
                :info_released_date,
-               :info_cd_reviewed_by)");    
+               :info_cd_reviewed_by,
+               :cron_date)");    
       
              
               
@@ -331,8 +344,8 @@ class Report{
                $sstmt->bindParam(':info_bussiness_address', $info_bussiness_address);
                $sstmt->bindParam(':info_released_date', $info_released_date);
                $sstmt->bindParam(':info_cd_reviewed_by', $info_cd_reviewed_by);
-
-                         
+               $sstmt->bindParam(':cron_date', $cron_date);
+                            
              $info_renewable_date = $v['Ren_Date'];
              $info_branch = $v['Branch'];
              $info_kiosk = $v['Kiosk'];
@@ -364,108 +377,107 @@ class Report{
              $info_bussiness_address = $v['Bus_Address'];
              $info_released_date = $v['Released_Date'];
              $info_cd_reviewed_by = $v['CRD_Name'];
+             $cron_date = date('Y-m-d H:i:s');
+
 
              
 
                $sstmt->execute();
         
 
-               $ssstmt = $this->connJeon->prepare("INSERT INTO crm_telemarketing(tele_loan_id,
-               tele_status,
-               tele_note,
-               tele_remarks,
-               tele_date,
-               tele_last_modified_by
-               )values(
-               :tele_loan_id,
-               :tele_status,
-               :tele_note,
-               :tele_remarks,
-               :tele_date,
-               :tele_last_modified_by)");    
-      
-             
-       $ssstmt->bindParam(':tele_loan_id', $tele_loan_id);
-       $ssstmt->bindParam(':tele_status', $tele_status);
-       $ssstmt->bindParam(':tele_note', $tele_note);
-       $ssstmt->bindParam(':tele_remarks', $tele_remarks);
-       $ssstmt->bindParam(':tele_date', $tele_date);
-       $ssstmt->bindParam(':tele_last_modified_by', $tele_last_modified_by);
-                                 
-             $tele_loan_id = $i;
-             $tele_status = $v['Status'];
-             $tele_note = $v['Note'];
-             $tele_remarks = $v['Remarks'];
-             $tele_date = $v['Date'];
-             $tele_last_modified_by = $v['Last_Modified_By'];
-         
-            
 
-               $ssstmt->execute();
-
-
-               
-               $sssstmt = $this->connJeon->prepare("INSERT INTO crm_character_reference(char_loan_id,
-               char_name,
-               char_contact_no
-               )values(
-               :char_loan_id,
-               :char_name,
-               :char_contact_no)");    
-      
-             
-       $sssstmt->bindParam(':char_loan_id', $char_loan_id);
-       $sssstmt->bindParam(':char_name', $char_name);
-       $sssstmt->bindParam(':char_contact_no', $char_contact_no);
-                                 
-             $char_loan_id = $i;
-             $char_name = $v['Ref_Name'];
-             $char_contact_no = $v['Ref_Contact'];
-       
-         
-            
-
-               $sssstmt->execute();
-
-
-
-               $ssssstmt = $this->connJeon->prepare("INSERT INTO crm_co_borrower_co_maker(co_loan_id,
-               co_co_borrowers,
-               co_co_borrower_contact,
-               co_co_maker,
-               co_co_maker_contact
-               )values(
-               :co_loan_id,
-               :co_co_borrowers,
-               :co_co_borrower_contact,
-               :co_co_maker,
-               :co_co_maker_contact)");    
-      
-             
-       $ssssstmt->bindParam(':co_loan_id', $co_loan_id);
-       $ssssstmt->bindParam(':co_co_borrowers', $co_co_borrowers);
-       $ssssstmt->bindParam(':co_co_borrower_contact', $co_co_borrower_contact);
-       $ssssstmt->bindParam(':co_co_maker', $co_co_maker);
-       $ssssstmt->bindParam(':co_co_maker_contact', $co_co_maker_contact);
-                                 
-             $co_loan_id = $i;
-             $co_co_borrowers = $v['Co_Borrower'];
-             $co_co_borrower_contact = $v['Co_Borrower_Contact'];
-             $co_co_maker = $v['Co_Maker'];
-             $co_co_maker_contact = $v['Co_Maker_Contact'];
-       
-         
-            
-
-               $ssssstmt->execute();
                if($sstmt){
+
+                $ssstmt = $this->connJeon->prepare("INSERT INTO crm_telemarketing(tele_loan_id,
+                tele_status,
+                tele_note,
+                tele_remarks,
+                tele_date,
+                tele_last_modified_by
+                )values(
+                :tele_loan_id,
+                :tele_status,
+                :tele_note,
+                :tele_remarks,
+                :tele_date,
+                :tele_last_modified_by)");    
+       
+              
+        $ssstmt->bindParam(':tele_loan_id', $tele_loan_id);
+        $ssstmt->bindParam(':tele_status', $tele_status);
+        $ssstmt->bindParam(':tele_note', $tele_note);
+        $ssstmt->bindParam(':tele_remarks', $tele_remarks);
+        $ssstmt->bindParam(':tele_date', $tele_date);
+        $ssstmt->bindParam(':tele_last_modified_by', $tele_last_modified_by);
+                                  
+              $tele_loan_id = $i;
+              $tele_status = $v['Status'];
+              $tele_note = $v['Note'];
+              $tele_remarks = $v['Remarks'];
+              $tele_date = $v['Date'];
+              $tele_last_modified_by = $v['Last_Modified_By'];
+          
+             
+ 
+                $ssstmt->execute();
+ 
+ 
+                
+                $sssstmt = $this->connJeon->prepare("INSERT INTO crm_character_reference(char_loan_id,
+                char_name,
+                char_contact_no
+                )values(
+                :char_loan_id,
+                :char_name,
+                :char_contact_no)");    
+ 
+        $sssstmt->bindParam(':char_loan_id', $char_loan_id);
+        $sssstmt->bindParam(':char_name', $char_name);
+        $sssstmt->bindParam(':char_contact_no', $char_contact_no);
+                                  
+              $char_loan_id = $i;
+              $char_name = $v['Ref_Name'];
+              $char_contact_no = $v['Ref_Contact'];
+        
+                $sssstmt->execute();
+ 
+ 
+ 
+                $ssssstmt = $this->connJeon->prepare("INSERT INTO crm_co_borrower_co_maker(co_loan_id,
+                co_co_borrowers,
+                co_co_borrower_contact,
+                co_co_maker,
+                co_co_maker_contact
+                )values(
+                :co_loan_id,
+                :co_co_borrowers,
+                :co_co_borrower_contact,
+                :co_co_maker,
+                :co_co_maker_contact)");    
+       
+              
+        $ssssstmt->bindParam(':co_loan_id', $co_loan_id);
+        $ssssstmt->bindParam(':co_co_borrowers', $co_co_borrowers);
+        $ssssstmt->bindParam(':co_co_borrower_contact', $co_co_borrower_contact);
+        $ssssstmt->bindParam(':co_co_maker', $co_co_maker);
+        $ssssstmt->bindParam(':co_co_maker_contact', $co_co_maker_contact);
+                                  
+              $co_loan_id = $i;
+              $co_co_borrowers = $v['Co_Borrower'];
+              $co_co_borrower_contact = $v['Co_Borrower_Contact'];
+              $co_co_maker = $v['Co_Maker'];
+              $co_co_maker_contact = $v['Co_Maker_Contact'];
+             
+              $ssssstmt->execute();
+
+
                   print_r($v['PN_Number']. ' Data has been transfered!');
                }else{
-                print_r($v['PN_Number'].' Is not a new lead! ');
+                print_r($v['PN_Number'].' Is not a new lead or duplicated! ');
                }
           $i++;
            }else{
-               print_r($v['PN_Number'].' Error');
+               print_r($v['PN_Number'].' Is not a new lead or duplicated!');
          }
         }
       } 

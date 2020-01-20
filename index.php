@@ -4,4 +4,5 @@ $class = new Report();
 $data = $class->Sofia(); //1st
 // $data = $class->reseed(); //2nd
 
+
 ?>
